@@ -1,6 +1,6 @@
 namespace OatmealDome.NinLib.CafeNus;
 
-public sealed class NusFilesystem
+public sealed class NusFilesystem : IDisposable
 {
     private readonly NusContentHolder _baseContentHolder;
     private readonly NusContentHolder? _updateContentHolder;
@@ -32,6 +32,12 @@ public sealed class NusFilesystem
                 _files[filePath] = NusSource.Update;
             }
         }
+    }
+    
+    public void Dispose()
+    {
+        _baseContentHolder.Dispose();
+        _updateContentHolder?.Dispose();
     }
     
     public byte[] GetFile(string path)
