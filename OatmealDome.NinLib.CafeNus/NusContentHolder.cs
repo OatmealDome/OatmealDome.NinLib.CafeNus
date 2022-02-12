@@ -11,20 +11,20 @@ namespace OatmealDome.NinLib.CafeNus
             private set;
         }
 
-        private Tmd Tmd;
-        private byte[] TitleKey;
-        private List<Stream> ContentStreams;
-        private List<object> StreamLocks;
-        private Fst Fst;
+        private readonly Tmd _tmd;
+        private readonly byte[] _titleKey;
+        private readonly List<Stream> _contentStreams;
+        private readonly List<object> _streamLocks;
+        private readonly Fst _fst;
 
         public NusContentHolder(string basePath, byte[] commonKey)
         {
-            ContentStreams = new List<Stream>();
-            StreamLocks = new List<object>();
+            _contentStreams = new List<Stream>();
+            _streamLocks = new List<object>();
 
             // Search for the TMD by looking for files that begin with "tm"
             // Some might be "tmd", and some might have the version appended, like "tmd.16"
-            string tmdPath = Directory.EnumerateFiles(basePath, "tm*").FirstOrDefault();
+            string? tmdPath = Directory.EnumerateFiles(basePath, "tm*").FirstOrDefault();
             if (tmdPath == null)
             {
                 throw new Exception("Could not find tmd");
@@ -32,7 +32,7 @@ namespace OatmealDome.NinLib.CafeNus
 
             using (FileStream stream = File.OpenRead(tmdPath))
             {
-                Tmd = new Tmd(stream);
+                _tmd = new Tmd(stream);
             }
 
             using (FileStream stream = File.OpenRead(Path.Combine(basePath, "cetk")))
@@ -43,46 +43,46 @@ namespace OatmealDome.NinLib.CafeNus
                 using (MemoryStream outputStream = new MemoryStream())
                 {
                     byte[] titleKeyIv = new byte[16];
-                    Array.Copy(BitConverter.GetBytes(Tmd.TitleId).Reverse().ToArray(), titleKeyIv, 8);
+                    Array.Copy(BitConverter.GetBytes(_tmd.TitleId).Reverse().ToArray(), titleKeyIv, 8);
 
                     DecryptAesCbc(inputStream, outputStream, commonKey, titleKeyIv);
 
-                    TitleKey = outputStream.ToArray();
+                    _titleKey = outputStream.ToArray();
                 }
             }
             
-            foreach (TmdContent content in Tmd.Contents)
+            foreach (TmdContent content in _tmd.Contents)
             {
                 FileStream fileStream = File.OpenRead(Path.Combine(basePath, content.Id.ToString("x8")));
 
                 if ((content.Type & 2) != 0) // has hash tree
                 {
-                    ContentStreams.Add(new NusHashedContentStream(fileStream, TitleKey));
+                    _contentStreams.Add(new NusHashedContentStream(fileStream, _titleKey));
                 }
                 else // normal, just AES-CBC encrypted
                 {
                     MemoryStream memoryStream = new MemoryStream();
                     
-                    DecryptAesCbc(fileStream, memoryStream, TitleKey, new byte[16]);
+                    DecryptAesCbc(fileStream, memoryStream, _titleKey, new byte[16]);
 
                     memoryStream.Seek(0, SeekOrigin.Begin);
 
-                    ContentStreams.Add(memoryStream);
+                    _contentStreams.Add(memoryStream);
 
                     fileStream.Dispose();
                 }
 
-                StreamLocks.Add(new object());
+                _streamLocks.Add(new object());
             }
 
             // The FST is always at content idx 0
-            Fst = new Fst(ContentStreams[0]);
+            _fst = new Fst(_contentStreams[0]);
 
             Files = new List<string>();
 
-            foreach (string path in Fst.GetAllFilePaths())
+            foreach (string path in _fst.GetAllFilePaths())
             {
-                FstFileEntry entry = Fst.GetEntry(path);
+                FstFileEntry entry = _fst.GetEntry(path);
 
                 if (!entry.IsNotInPackage)
                 {
@@ -93,7 +93,7 @@ namespace OatmealDome.NinLib.CafeNus
 
         public void Dispose()
         {
-            foreach (Stream stream in ContentStreams)
+            foreach (Stream stream in _contentStreams)
             {
                 stream.Dispose();
             }
@@ -101,18 +101,18 @@ namespace OatmealDome.NinLib.CafeNus
 
         public Stream GetFile(string path)
         {
-            FstFileEntry entry = Fst.GetEntry(path);
+            FstFileEntry entry = _fst.GetEntry(path);
             
             if (entry.IsNotInPackage)
             {
                 throw new FileNotFoundException("Can't access deleted file");
             }
             
-            lock (StreamLocks[entry.ContentIdx])
+            lock (_streamLocks[entry.ContentIdx])
             {
-                Stream contentStream = ContentStreams[entry.ContentIdx];
+                Stream contentStream = _contentStreams[entry.ContentIdx];
                 
-                contentStream.Seek(entry.Offset * Fst.OffsetFactor, SeekOrigin.Begin);
+                contentStream.Seek(entry.Offset * _fst.OffsetFactor, SeekOrigin.Begin);
 
                 byte[] file = new byte[entry.Size];
                 contentStream.Read(file, 0, (int)entry.Size);
@@ -131,10 +131,8 @@ namespace OatmealDome.NinLib.CafeNus
 
             ICryptoTransform decryptor = aes.CreateDecryptor(key, iv);
 
-            using (CryptoStream cryptoStream = new CryptoStream(inStream, decryptor, CryptoStreamMode.Read))
-            {
-                cryptoStream.CopyTo(outStream);
-            }
+            using CryptoStream cryptoStream = new CryptoStream(inStream, decryptor, CryptoStreamMode.Read);
+            cryptoStream.CopyTo(outStream);
         }
     }
 }
