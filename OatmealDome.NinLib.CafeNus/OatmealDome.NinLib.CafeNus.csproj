@@ -4,6 +4,12 @@
         <TargetFramework>net6.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+
+        <PackageId>OatmealDome.NinLib.CafeNus</PackageId>
+        <Version>1.0.0</Version>
+        <Authors>OatmealDome</Authors>
+        <Description>Wii U NUS files decryptor and reader.</Description>
+        <RepositoryUrl>https://github.com/OatmealDome/OatmealDome.NinLib.CafeNus</RepositoryUrl>
     </PropertyGroup>
 
     <ItemGroup>
