@@ -99,7 +99,7 @@ namespace OatmealDome.NinLib.CafeNus
             }
         }
 
-        public Stream GetFile(string path)
+        public byte[] GetFile(string path)
         {
             FstFileEntry entry = _fst.GetEntry(path);
             
@@ -117,7 +117,7 @@ namespace OatmealDome.NinLib.CafeNus
                 byte[] file = new byte[entry.Size];
                 contentStream.Read(file, 0, (int)entry.Size);
 
-                return new MemoryStream(file);
+                return file;
             }
         }
 

@@ -34,7 +34,7 @@ public sealed class NusFilesystem
         }
     }
     
-    public Stream GetFile(string path)
+    public byte[] GetFile(string path)
     {
         if (_files[path] == NusSource.Base)
         {
