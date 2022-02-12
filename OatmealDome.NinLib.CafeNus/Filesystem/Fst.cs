@@ -4,7 +4,7 @@ namespace OatmealDome.NinLib.CafeNus.Filesystem
 {
     internal class Fst
     {
-        private static readonly uint MAGIC = 0x46535400; // "FST\0"
+        private static readonly uint Magic = 0x46535400; // "FST\0"
 
         public uint OffsetFactor
         {
@@ -12,9 +12,9 @@ namespace OatmealDome.NinLib.CafeNus.Filesystem
             private set;
         }
 
-        private List<FstSecondaryHeader> SecondaryHeaders;
-        private long NameTableOffset;
-        private Dictionary<string, FstFileEntry> FileEntries;
+        private readonly List<FstSecondaryHeader> _secondaryHeaders;
+        private readonly long _nameTableOffset;
+        private readonly Dictionary<string, FstFileEntry> _fileEntries;
 
         public Fst(Stream stream)
         {
@@ -22,7 +22,7 @@ namespace OatmealDome.NinLib.CafeNus.Filesystem
 
             reader.ByteOrder = ByteOrder.BigEndian;
 
-            if (reader.ReadUInt32() != MAGIC)
+            if (reader.ReadUInt32() != Magic)
             {
                 throw new Exception("Invalid FST magic");
             }
@@ -33,10 +33,10 @@ namespace OatmealDome.NinLib.CafeNus.Filesystem
             
             reader.Seek(18); // padding?
 
-            SecondaryHeaders = new List<FstSecondaryHeader>();
+            _secondaryHeaders = new List<FstSecondaryHeader>();
             for (int i = 0; i < secondaryHeaderCount; i++)
             {
-                SecondaryHeaders.Add(new FstSecondaryHeader(reader));
+                _secondaryHeaders.Add(new FstSecondaryHeader(reader));
             }
 
             long fileEntriesOffset = reader.Position;
@@ -47,9 +47,9 @@ namespace OatmealDome.NinLib.CafeNus.Filesystem
 
             reader.Seek(4); // ???
 
-            NameTableOffset = fileEntriesOffset + (totalEntries * 0x10);
+            _nameTableOffset = fileEntriesOffset + (totalEntries * 0x10);
 
-            FileEntries = new Dictionary<string, FstFileEntry>();
+            _fileEntries = new Dictionary<string, FstFileEntry>();
 
             LoadDirectory(reader, 1, totalEntries, "/");
         }
@@ -67,7 +67,7 @@ namespace OatmealDome.NinLib.CafeNus.Filesystem
                 uint nameOffset = typeAndName & 0xFFFFFF;
 
                 string path;
-                using (reader.TemporarySeek(NameTableOffset + (long)nameOffset, SeekOrigin.Begin))
+                using (reader.TemporarySeek(_nameTableOffset + (long)nameOffset, SeekOrigin.Begin))
                 {
                     path = currentPath + reader.ReadString(StringDataFormat.ZeroTerminated);
                 }
@@ -84,7 +84,7 @@ namespace OatmealDome.NinLib.CafeNus.Filesystem
                 }
                 else // file
                 {
-                    FileEntries.Add(path, new FstFileEntry()
+                    _fileEntries.Add(path, new FstFileEntry()
                     {
                         Offset = fileOffset,
                         Size = fileSize,
@@ -102,17 +102,17 @@ namespace OatmealDome.NinLib.CafeNus.Filesystem
 
         public int GetEntryCount()
         {
-            return FileEntries.Count;
+            return _fileEntries.Count;
         }
 
         public IEnumerable<string> GetAllFilePaths()
         {
-            return FileEntries.Keys;
+            return _fileEntries.Keys;
         }
 
         public FstFileEntry GetEntry(string path)
         {
-            return FileEntries[path];
+            return _fileEntries[path];
         }
     }
 }
