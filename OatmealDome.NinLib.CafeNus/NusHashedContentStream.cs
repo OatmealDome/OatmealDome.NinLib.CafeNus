@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 
 namespace OatmealDome.NinLib.CafeNus
 {
-    class NusHashedContentStream : Stream
+    internal class NusHashedContentStream : Stream
     {
         public override bool CanRead => true;
 

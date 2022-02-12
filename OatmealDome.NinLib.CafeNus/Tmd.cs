@@ -2,7 +2,7 @@ using OatmealDome.BinaryData;
 
 namespace OatmealDome.NinLib.CafeNus
 {
-    class Tmd
+    internal class Tmd
     {
         public ulong TitleId
         {

@@ -2,7 +2,7 @@ using OatmealDome.BinaryData;
 
 namespace OatmealDome.NinLib.CafeNus
 {
-    class Ticket
+    internal class Ticket
     {
         public byte[] EncryptedTitleKey
         {

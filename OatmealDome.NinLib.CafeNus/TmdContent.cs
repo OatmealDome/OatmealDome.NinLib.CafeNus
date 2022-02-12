@@ -2,7 +2,7 @@ using OatmealDome.BinaryData;
 
 namespace OatmealDome.NinLib.CafeNus
 {
-    class TmdContent
+    internal class TmdContent
     {
         public uint Id
         {
