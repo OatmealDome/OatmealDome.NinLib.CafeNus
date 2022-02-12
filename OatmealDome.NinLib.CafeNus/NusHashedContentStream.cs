@@ -11,24 +11,24 @@ namespace OatmealDome.NinLib.CafeNus
         public override bool CanWrite => false;
 
         // In 0xFC00 blocks
-        private long DataLength;
+        private readonly long _dataLength;
 
         public override long Length
         {
             get
             {
-                return DataLength;
+                return _dataLength;
             }
         }
 
         // Within the "real data" space of 0xFC00 blocks
-        private long DataPosition;
+        private long _dataPosition;
 
         public override long Position
         {
             get
             {
-                return DataPosition;
+                return _dataPosition;
             }
             set
             {
@@ -36,89 +36,89 @@ namespace OatmealDome.NinLib.CafeNus
             }
         }
 
-        private Stream InnerStream;
-        private bool KeepStreamOpen;
-        private bool IsDisposed;
+        private readonly Stream _innerStream;
+        private readonly bool _keepStreamOpen;
+        private bool _isDisposed;
 
-        private Aes Aes;
-        private int CurrentBlock;
-        private byte[] HashBlock;
-        private byte[] DataBlock;
+        private readonly Aes _aes;
+        private int _currentBlock;
+        private readonly byte[] _hashBlock;
+        private readonly byte[] _dataBlock;
 
         public NusHashedContentStream(Stream stream, byte[] titleKey, bool keepOpen = false)
         {
-            Aes = Aes.Create();
-            Aes.Mode = CipherMode.CBC;
-            Aes.Padding = PaddingMode.None;
-            Aes.Key = titleKey;
+            _aes = Aes.Create();
+            _aes.Mode = CipherMode.CBC;
+            _aes.Padding = PaddingMode.None;
+            _aes.Key = titleKey;
 
-            InnerStream = stream;
-            KeepStreamOpen = keepOpen;
-            IsDisposed = false;
+            _innerStream = stream;
+            _keepStreamOpen = keepOpen;
+            _isDisposed = false;
 
-            CurrentBlock = 0;
-            HashBlock = new byte[0x400];
-            DataBlock = new byte[0xFC00];
+            _currentBlock = 0;
+            _hashBlock = new byte[0x400];
+            _dataBlock = new byte[0xFC00];
 
-            long blockCount = InnerStream.Length / 0x10000;
-            DataLength = blockCount * 0xFC00;
+            long blockCount = _innerStream.Length / 0x10000;
+            _dataLength = blockCount * 0xFC00;
 
-            DataPosition = 0;
+            _dataPosition = 0;
 
             UpdateBlockData();
         }
 
         protected override void Dispose(bool disposing)
         {
-            if (IsDisposed)
+            if (_isDisposed)
             {
                 return;
             }
 
             base.Dispose(disposing);
 
-            if (!KeepStreamOpen)
+            if (!_keepStreamOpen)
             {
-                InnerStream.Dispose();
+                _innerStream.Dispose();
             }
 
-            IsDisposed = true;
+            _isDisposed = true;
         }
 
         private void AdvanceBlock()
         {
-            SetBlock(CurrentBlock + 1);
+            SetBlock(_currentBlock + 1);
         }
 
         private void SetBlock(int block)
         {
-            CurrentBlock = block;
+            _currentBlock = block;
 
             UpdateBlockData();
         }
 
         private void UpdateBlockData()
         {
-            long blockOffset = CurrentBlock * 0x10000;
+            long blockOffset = _currentBlock * 0x10000;
 
-            InnerStream.Seek(blockOffset, SeekOrigin.Begin);
+            _innerStream.Seek(blockOffset, SeekOrigin.Begin);
 
             // Hash blocks use all zero IV
             byte[] iv = new byte[16];
-            Aes.IV = iv;
+            _aes.IV = iv;
 
-            using (CryptoStream cryptoStream = new CryptoStream(InnerStream, Aes.CreateDecryptor(), CryptoStreamMode.Read, true))
+            using (CryptoStream cryptoStream = new CryptoStream(_innerStream, _aes.CreateDecryptor(), CryptoStreamMode.Read, true))
             {
-                cryptoStream.Read(HashBlock, 0, 0x400);
+                cryptoStream.Read(_hashBlock, 0, 0x400);
             }
 
             // h0 hash is the IV
-            Array.Copy(HashBlock, 0x14 * (CurrentBlock % 16), iv, 0, 0x10);
-            Aes.IV = iv;
+            Array.Copy(_hashBlock, 0x14 * (_currentBlock % 16), iv, 0, 0x10);
+            _aes.IV = iv;
 
-            using (CryptoStream cryptoStream = new CryptoStream(InnerStream, Aes.CreateDecryptor(), CryptoStreamMode.Read, true))
+            using (CryptoStream cryptoStream = new CryptoStream(_innerStream, _aes.CreateDecryptor(), CryptoStreamMode.Read, true))
             {
-                cryptoStream.Read(DataBlock, 0, 0xFC00);
+                cryptoStream.Read(_dataBlock, 0, 0xFC00);
             }
 
             // Only hash levels 0 to 2 are verified, 3 isn't because often we have no h3 block
@@ -143,27 +143,27 @@ namespace OatmealDome.NinLib.CafeNus
             byte[] hash;
             if (hashLevel == 0)
             {
-                hash = sha1.ComputeHash(DataBlock);
+                hash = sha1.ComputeHash(_dataBlock);
             }
             else
             {
-                hash = sha1.ComputeHash(HashBlock, 0x140 * (hashLevel - 1), 0x140);
+                hash = sha1.ComputeHash(_hashBlock, 0x140 * (hashLevel - 1), 0x140);
             }
 
             int hashNum = 0;
             switch (hashLevel)
             {
                 case 0:
-                    hashNum = CurrentBlock % 16;
+                    hashNum = _currentBlock % 16;
                     break;
                 case 1:
-                    hashNum = (CurrentBlock / 16) % 16;
+                    hashNum = (_currentBlock / 16) % 16;
                     break;
                 case 2:
-                    hashNum = (CurrentBlock / 256) % 16;
+                    hashNum = (_currentBlock / 256) % 16;
                     break;
                 case 3:
-                    hashNum = (CurrentBlock / 4096) % 16;
+                    hashNum = (_currentBlock / 4096) % 16;
                     break;
             }
 
@@ -174,7 +174,7 @@ namespace OatmealDome.NinLib.CafeNus
             }
             else
             {
-                Array.Copy(HashBlock, (0x140 * hashLevel) + (hashNum * 0x14), expectedHash, 0, 0x14);
+                Array.Copy(_hashBlock, (0x140 * hashLevel) + (hashNum * 0x14), expectedHash, 0, 0x14);
             }
 
             return expectedHash.SequenceEqual(hash);
@@ -189,20 +189,20 @@ namespace OatmealDome.NinLib.CafeNus
         {
             for (int i = 0; i < count; i++)
             {
-                if (DataPosition >= DataLength)
+                if (_dataPosition >= _dataLength)
                 {
                     return i;
                 }
 
-                long blockPosition = DataPosition % 0xFC00;
+                long blockPosition = _dataPosition % 0xFC00;
 
-                buffer[offset + i] = DataBlock[blockPosition];
+                buffer[offset + i] = _dataBlock[blockPosition];
 
-                DataPosition++;
+                _dataPosition++;
 
                 if ((blockPosition + 1) == 0xFC00)
                 {
-                    if (DataPosition >= DataLength)
+                    if (_dataPosition >= _dataLength)
                     {
                         return i;
                     }
@@ -228,7 +228,7 @@ namespace OatmealDome.NinLib.CafeNus
             }
             else if (origin == SeekOrigin.Current)
             {
-                newOffset = DataPosition + offset;
+                newOffset = _dataPosition + offset;
             }
             else
             {
@@ -240,7 +240,7 @@ namespace OatmealDome.NinLib.CafeNus
                 throw new Exception("Seek past end");
             }
 
-            DataPosition = newOffset;
+            _dataPosition = newOffset;
 
             long block = newOffset / 0xFC00;
             SetBlock((int)block);
